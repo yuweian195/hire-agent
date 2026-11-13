@@ -24,3 +24,28 @@ QUESTIONS_USER = """岗位：{job_title}
 候选人项目：{projects}
 
 请生成 5 道面试题。"""
+
+ANSWER_REVIEW_SYSTEM = """你是资深技术面试官。请针对候选人的一道面试回答给出简短、具体的反馈。
+要求：只评价回答本身，不重复题目；指出 1-3 个优点和 1-3 个需要改进的点；给一个追问建议。
+只输出 JSON 对象，字段为 strengths（字符串数组）、weaknesses（字符串数组）、follow_up（字符串）。"""
+
+ANSWER_REVIEW_USER = """岗位：{job_title}
+岗位必备技能：{required_skills}
+面试题：{question}
+候选人回答：{answer}
+规则评分：{dimensions}
+
+请输出反馈 JSON。"""
+
+INTERVIEW_SUMMARY_SYSTEM = """你是招聘负责人。请根据候选人的面试回答评分与反馈，写 2-3 句中文面试结论。
+要求：给出明确结论（通过/待定/不通过）；指出最强项和最大风险；不要复述每道题；不要编造回答中没有的内容。"""
+
+INTERVIEW_SUMMARY_USER = """岗位：{job_title}
+候选人：{candidate_name}
+各题评分：{scores}
+平均分：{overall_score}/10
+结论：{recommendation}
+主要优势：{strengths}
+主要风险：{weaknesses}
+
+请输出 2-3 句中文面试结论。"""

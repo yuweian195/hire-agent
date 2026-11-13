@@ -225,6 +225,7 @@ def save_results_node(state: ScreeningState) -> dict:
         "parsed_resume": parsed,
         "trace": trace,
         "llm_mode": state.get("llm_mode", "offline"),
+        "stage": state.get("stage", "screening"),
         "created_at": state["created_at"],
     }
     repository = state.get("repository") or get_repository()
@@ -237,6 +238,7 @@ def save_results_node(state: ScreeningState) -> dict:
             "total_score": payload["total_score"],
             "recommendation": payload["recommendation"],
             "match_rate": payload["job_match"]["overall_rate"],
+            "stage": payload["stage"],
             "created_at": payload["created_at"],
             "payload": payload,
         }

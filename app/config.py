@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "HireAgent"
-    version: str = "0.1.0"
+    version: str = "0.2.0"
 
     database_path: Path = BASE_DIR / "data" / "hire_agent.db"
     jobs_dir: Path = BASE_DIR / "data" / "jobs"
@@ -31,6 +31,8 @@ class Settings(BaseSettings):
 
     recommend_threshold: float = 8.0
     hold_threshold: float = 6.0
+    interview_pass_threshold: float = 7.5
+    interview_hold_threshold: float = 6.0
 
     @property
     def llm_enabled(self) -> bool:

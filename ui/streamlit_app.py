@@ -6,7 +6,10 @@ Run from the repository root:
 
 from __future__ import annotations
 
+import csv
 import html
+import io
+import json
 import sys
 from pathlib import Path
 
@@ -16,7 +19,19 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.schemas import Recommendation, ScreeningResponse, ScreenRequest  # noqa: E402
+from app.schemas import (  # noqa: E402
+    BatchScreenRequest,
+    BatchScreenResponse,
+    InterviewEvaluateRequest,
+    InterviewItem,
+    InterviewReport,
+    Recommendation,
+    ScreeningResponse,
+    ScreeningStage,
+    ScreenRequest,
+)
+from app.services.interview import get_interview_service  # noqa: E402
+from app.services.reporting import interview_markdown, screening_markdown  # noqa: E402
 from app.services.screening import get_service  # noqa: E402
 from app.tools.resume_parser import decode_text  # noqa: E402
 
@@ -57,6 +72,7 @@ CSS = """
   .hero-job { color: #64748b; font-size: 0.86rem; margin-top: 2px; }
   .badge { display: inline-block; padding: 5px 11px; border-radius: 999px; font-size: 0.76rem; font-weight: 700; }
   .badge.recommend { background: #dcfce7; color: #15803d; }
+  .badge.pass { background: #dcfce7; color: #15803d; }
   .badge.hold { background: #fef3c7; color: #b45309; }
   .badge.reject { background: #fee2e2; color: #b91c1c; }
   .metric-card { background: #f8fafc; border: 1px solid #edf1f7; border-radius: 12px; padding: 12px 14px; }
@@ -97,6 +113,15 @@ REC_LABEL = {
     Recommendation.HOLD: ("待定", "hold"),
     Recommendation.REJECT: ("淘汰", "reject"),
 }
+STAGE_LABEL = {
+    ScreeningStage.SCREENING: "初筛",
+    ScreeningStage.INTERVIEW: "面试中",
+    ScreeningStage.OFFER: "Offer",
+    ScreeningStage.REJECTED: "已淘汰",
+    ScreeningStage.TALENT_POOL: "人才库",
+}
+INTERVIEW_LABEL = {"pass": ("通过", "pass"), "hold": ("待定", "hold"), "reject": ("不通过", "reject")}
+INTERVIEW_SAMPLE = ROOT / "data" / "interviews" / "sample_java.json"
 SAMPLES = [
     ("张伟 · 高级 Java（强匹配）", "zhangwei.txt"),
     ("赵敏 · Java（中等匹配）", "zhaomin.txt"),
@@ -115,6 +140,18 @@ def load_sample(filename: str) -> None:
 
 def reset_result() -> None:
     st.session_state.result = None
+
+
+def load_interview_sample() -> None:
+    data = json.loads(INTERVIEW_SAMPLE.read_text(encoding="utf-8"))
+    st.session_state.interview_candidate = data["candidate_name"]
+    st.session_state.interview_job = data["job_id"]
+    st.session_state.interview_count = len(data["items"])
+    for index, item in enumerate(data["items"]):
+        st.session_state[f"iq_{index}"] = item["question"]
+        st.session_state[f"ia_{index}"] = item["answer"]
+        st.session_state[f"ic_{index}"] = item.get("category", "")
+    st.session_state.interview_result = None
 
 
 def score_color(score: float) -> str:
@@ -138,7 +175,7 @@ def render_chips(items: list[str], css: str, empty: str = "无") -> str:
     )
 
 
-def render_result(result: ScreeningResponse) -> None:
+def render_result(result: ScreeningResponse, key_prefix: str = "main") -> None:
     label, css = REC_LABEL[result.recommendation]
     st.markdown(
         f"""
@@ -146,7 +183,7 @@ def render_result(result: ScreeningResponse) -> None:
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
             <div>
               <div class="hero-name">{html.escape(result.candidate_name)}</div>
-              <div class="hero-job">应聘 {html.escape(result.job_title)} · 筛选编号 {result.id}</div>
+              <div class="hero-job">应聘 {html.escape(result.job_title)} · 流程 {STAGE_LABEL[result.stage]} · 筛选编号 {result.id}</div>
             </div>
             <div style="text-align:right;">
               <div class="hero-score">{result.total_score:.1f}<small>/10</small></div>
@@ -258,6 +295,91 @@ def render_result(result: ScreeningResponse) -> None:
             unsafe_allow_html=True,
         )
 
+    st.download_button(
+        "下载筛选报告（Markdown）",
+        data=screening_markdown(result),
+        file_name=f"screening-{result.candidate_name}-{result.id}.md",
+        mime="text/markdown",
+        key=f"download_screening_{key_prefix}_{result.id}",
+    )
+
+
+def render_interview_report(report: InterviewReport, key_prefix: str = "main") -> None:
+    label, css = INTERVIEW_LABEL[report.recommendation.value]
+    st.markdown(
+        f"""
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+            <div>
+              <div class="hero-name">{html.escape(report.candidate_name)}</div>
+              <div class="hero-job">面试评估 · {html.escape(report.job_title)} · 报告编号 {report.id}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="hero-score">{report.overall_score:.1f}<small>/10</small></div>
+              <div style="margin-top:6px;"><span class="badge {css}">{label}</span></div>
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f'<div class="card"><div class="section-label">面试结论</div>'
+        f'<div class="summary-box">{html.escape(report.summary)}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    for index, item in enumerate(report.answer_evaluations, start=1):
+        rows = []
+        for key, label_text in (
+            ("relevance", "相关性"),
+            ("depth", "深度"),
+            ("structure", "结构"),
+            ("communication", "表达"),
+        ):
+            value = item.dimensions.get(key, 0)
+            color = score_color(value)
+            rows.append(
+                f'<div class="dim-row"><div class="dim-head"><span>{label_text}</span>'
+                f'<b>{value:.1f}</b></div>'
+                f'<div class="dim-track"><div class="dim-fill" '
+                f'style="width:{max(2, int(value * 10))}%;background:{color};"></div></div></div>'
+            )
+        st.markdown(
+            f'<div class="card">'
+            f'<div class="section-label">第 {index} 题 · {item.score:.1f}/10</div>'
+            f'<div class="question-text" style="font-weight:600;">{html.escape(item.question)}</div>'
+            + "".join(rows)
+            + f'<div style="font-size:0.76rem;color:#64748b;margin-top:8px;">优势</div>'
+            f'<div>{render_chips(item.strengths, "ok")}</div>'
+            f'<div style="font-size:0.76rem;color:#64748b;margin-top:8px;">待改进</div>'
+            f'<div>{render_chips(item.weaknesses, "miss")}</div>'
+            f'<div class="summary-box" style="margin-top:10px;background:#f8fafc;border-left-color:#94a3b8;color:#475569;">'
+            f'追问建议：{html.escape(item.follow_up)}</div></div>',
+            unsafe_allow_html=True,
+        )
+
+    with st.expander("查看面试评估轨迹", expanded=False):
+        steps = "".join(
+            f'<div class="trace-step"><div class="trace-node">{html.escape(step.node)}</div>'
+            f'<div class="trace-summary">{html.escape(step.summary)}</div>'
+            f'<div class="trace-ms">{step.duration_ms} ms</div></div>'
+            for step in report.trace
+        )
+        st.markdown(
+            f'<div class="card" style="padding:14px 16px;">{steps}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.download_button(
+        "下载面试报告（Markdown）",
+        data=interview_markdown(report),
+        file_name=f"interview-{report.candidate_name}-{report.id}.md",
+        mime="text/markdown",
+        key=f"download_interview_{key_prefix}_{report.id}",
+    )
+
 
 service = get_service()
 
@@ -292,7 +414,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_screen, tab_history, tab_jobs = st.tabs(["简历筛选", "候选人库", "岗位库"])
+tab_screen, tab_batch, tab_interview, tab_history, tab_jobs = st.tabs(
+    ["简历筛选", "批量筛选", "面试评估", "候选人库", "岗位库"]
+)
 
 with tab_screen:
     input_col, result_col = st.columns([0.4, 0.6], gap="large")
@@ -395,6 +519,191 @@ with tab_screen:
                 unsafe_allow_html=True,
             )
 
+with tab_batch:
+    st.markdown('<div class="section-label">批量筛选与排名</div>', unsafe_allow_html=True)
+    st.caption("一次上传多份简历，按综合评分自动排名，结果会写入候选人库并支持导出 CSV。")
+
+    batch_jobs = service.list_jobs()
+    batch_job_id = st.selectbox(
+        "批量目标岗位",
+        options=[job.id for job in batch_jobs],
+        format_func=lambda job_id: next(
+            job.title for job in batch_jobs if job.id == job_id
+        ),
+        key="batch_job",
+    )
+    batch_files = st.file_uploader(
+        "选择多份简历（PDF / DOCX / TXT）",
+        type=["pdf", "docx", "txt", "md"],
+        accept_multiple_files=True,
+        key="batch_files",
+    )
+    if st.button("开始批量筛选", type="primary", key="run_batch"):
+        if not batch_files:
+            st.warning("请先选择至少一份简历。")
+        else:
+            texts = [decode_text(item.name, item.getvalue()) for item in batch_files]
+            texts = [text for text in texts if len(text.strip()) >= 10]
+            if not texts:
+                st.error("上传的文件中没有解析出有效简历文本。")
+            else:
+                with st.spinner(f"正在筛选 {len(texts)} 份简历…"):
+                    batch = service.screen_batch(
+                        BatchScreenRequest(job_id=batch_job_id, resume_texts=texts)
+                    )
+                    st.session_state.batch_result = batch.model_dump(mode="json")
+
+    stored_batch = st.session_state.get("batch_result")
+    if stored_batch:
+        batch = BatchScreenResponse.model_validate(stored_batch)
+        st.markdown(
+            f'<div class="section-label" style="margin-top:16px;">'
+            f"{html.escape(batch.job_title)} · 共 {batch.total} 份简历</div>",
+            unsafe_allow_html=True,
+        )
+        rows = [
+            {
+                "排名": item.rank,
+                "候选人": item.screening.candidate_name,
+                "评分": round(item.screening.total_score, 2),
+                "结论": REC_LABEL[item.screening.recommendation][0],
+                "匹配度": f"{item.screening.job_match.overall_rate:.0%}",
+                "缺失技能": "、".join(item.screening.skill_match.missing) or "无",
+            }
+            for item in batch.items
+        ]
+        st.dataframe(rows, width="stretch", hide_index=True)
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["排名", "候选人", "评分", "结论", "匹配度", "缺失技能", "筛选编号"])
+        for item in batch.items:
+            screening = item.screening
+            writer.writerow(
+                [
+                    item.rank,
+                    screening.candidate_name,
+                    f"{screening.total_score:.2f}",
+                    screening.recommendation.value,
+                    f"{screening.job_match.overall_rate:.0%}",
+                    "、".join(screening.skill_match.missing),
+                    screening.id,
+                ]
+            )
+        st.download_button(
+            "下载排名 CSV",
+            data=buffer.getvalue().encode("utf-8-sig"),
+            file_name=f"batch-{batch.job_id}.csv",
+            mime="text/csv",
+            key="download_batch",
+        )
+
+with tab_interview:
+    interview_service = get_interview_service()
+    if "interview_count" not in st.session_state:
+        load_interview_sample()
+
+    st.markdown('<div class="section-label">面试回答评估</div>', unsafe_allow_html=True)
+    st.caption("逐题评估相关性、深度、结构与表达，输出面试结论、改进建议和追问。")
+
+    interview_jobs = service.list_jobs()
+    job_ids = [job.id for job in interview_jobs]
+    if st.session_state.get("interview_job") not in job_ids:
+        st.session_state.interview_job = job_ids[0] if job_ids else None
+
+    head_col, name_col, sample_col = st.columns([0.45, 0.35, 0.2])
+    with head_col:
+        st.selectbox(
+            "目标岗位",
+            options=job_ids,
+            format_func=lambda job_id: next(
+                job.title for job in interview_jobs if job.id == job_id
+            ),
+            key="interview_job",
+        )
+    with name_col:
+        st.text_input("候选人", key="interview_candidate")
+    with sample_col:
+        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        st.button("载入示例回答", on_click=load_interview_sample, width="stretch")
+
+    count = int(st.session_state.get("interview_count", 0))
+    for index in range(count):
+        st.markdown(
+            f'<div class="section-label" style="margin-top:14px;">第 {index + 1} 题</div>',
+            unsafe_allow_html=True,
+        )
+        st.text_area("问题", key=f"iq_{index}", height=70)
+        st.text_area("回答", key=f"ia_{index}", height=150)
+
+    if st.button("开始面试评估", type="primary", key="run_interview"):
+        items = []
+        for index in range(count):
+            question = st.session_state.get(f"iq_{index}", "").strip()
+            answer = st.session_state.get(f"ia_{index}", "").strip()
+            if question and answer:
+                items.append(
+                    InterviewItem(
+                        question=question,
+                        answer=answer,
+                        category=st.session_state.get(f"ic_{index}", ""),
+                    )
+                )
+        if not items:
+            st.warning("请至少填写一道题的问题和回答。")
+        else:
+            with st.spinner("正在评估面试回答…"):
+                report = interview_service.evaluate(
+                    InterviewEvaluateRequest(
+                        job_id=st.session_state.get("interview_job"),
+                        candidate_name=st.session_state.get("interview_candidate", ""),
+                        items=items,
+                    )
+                )
+                st.session_state.interview_result = report.model_dump(mode="json")
+
+    stored_interview = st.session_state.get("interview_result")
+    current_interview_id = stored_interview.get("id") if stored_interview else None
+    if stored_interview:
+        render_interview_report(
+            InterviewReport.model_validate(stored_interview), key_prefix="current"
+        )
+
+    recent_interviews = [
+        item
+        for item in interview_service.list_recent(10)
+        if item.id != current_interview_id
+    ]
+    if recent_interviews:
+        st.markdown(
+            '<div class="section-label" style="margin-top:20px;">历史面试报告</div>',
+            unsafe_allow_html=True,
+        )
+        st.dataframe(
+            [
+                {
+                    "时间": item.created_at.strftime("%m-%d %H:%M"),
+                    "候选人": item.candidate_name,
+                    "岗位": item.job_title,
+                    "评分": round(item.overall_score, 2),
+                    "结论": INTERVIEW_LABEL[item.recommendation.value][0],
+                }
+                for item in recent_interviews
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+        interview_options = {
+            f"{item.created_at.strftime('%m-%d %H:%M')} · {item.candidate_name}": item.id
+            for item in recent_interviews
+        }
+        chosen_interview = st.selectbox(
+            "查看历史面试报告", options=list(interview_options.keys()), key="history_interview"
+        )
+        historical = interview_service.get_report(interview_options[chosen_interview])
+        if historical:
+            render_interview_report(historical, key_prefix="history")
+
 with tab_history:
     items = service.list_recent(50)
     if not items:
@@ -411,6 +720,7 @@ with tab_history:
                 "评分": round(item.total_score, 2),
                 "结论": REC_LABEL[item.recommendation][0],
                 "匹配度": f"{item.match_rate:.0%}",
+                "阶段": STAGE_LABEL.get(item.stage, item.stage.value),
             }
             for item in items
         ]
@@ -420,7 +730,25 @@ with tab_history:
         chosen = st.selectbox("查看详情", options=list(options.keys()))
         detail = service.get_screening(options[chosen])
         if detail:
-            render_result(detail)
+            render_result(detail, key_prefix="history")
+            stage_col, button_col = st.columns([0.55, 0.2])
+            with stage_col:
+                new_stage = st.selectbox(
+                    "更新流程状态",
+                    options=list(ScreeningStage),
+                    format_func=lambda stage: STAGE_LABEL.get(stage, stage.value),
+                    index=list(ScreeningStage).index(detail.stage),
+                    key=f"stage_select_{detail.id}",
+                )
+            with button_col:
+                st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+                if st.button("保存状态", key=f"stage_save_{detail.id}", width="stretch"):
+                    updated = service.update_stage(detail.id, new_stage)
+                    if updated:
+                        st.success(f"已更新为 {STAGE_LABEL.get(new_stage, new_stage.value)}")
+                        st.rerun()
+                    else:
+                        st.error("更新失败，记录不存在。")
 
 with tab_jobs:
     st.markdown('<div class="section-label">在招岗位</div>', unsafe_allow_html=True)

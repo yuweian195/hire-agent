@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from app.config import Settings
 from app.db import ScreeningRepository
 from app.llm.client import LLMClient
+from app.services.interview import InterviewService
 from app.services.screening import ScreeningService
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +23,22 @@ def service(settings: Settings) -> ScreeningService:
         repository=ScreeningRepository(settings.database_path),
         llm=LLMClient(settings),
         jobs_dir=ROOT / "data" / "jobs",
+    )
+
+
+@pytest.fixture
+def interview_service(settings: Settings) -> InterviewService:
+    return InterviewService(
+        repository=ScreeningRepository(settings.database_path),
+        llm=LLMClient(settings),
+        jobs_dir=ROOT / "data" / "jobs",
+    )
+
+
+@pytest.fixture
+def sample_interview() -> dict:
+    return json.loads(
+        (ROOT / "data" / "interviews" / "sample_java.json").read_text(encoding="utf-8")
     )
 
 

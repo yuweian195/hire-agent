@@ -125,6 +125,58 @@ class LLMClient:
                 continue
         return questions or None
 
+    def review_answer(
+        self,
+        question: str,
+        answer: str,
+        job: JobRequirements,
+        dimensions: dict[str, float],
+    ) -> dict | None:
+        user = prompts.ANSWER_REVIEW_USER.format(
+            job_title=job.title,
+            required_skills="、".join(job.required_skills),
+            question=question,
+            answer=answer,
+            dimensions="；".join(f"{key} {value}" for key, value in dimensions.items()),
+        )
+        content = self._chat(prompts.ANSWER_REVIEW_SYSTEM, user, json_mode=True)
+        if not content:
+            return None
+        data = _parse_json(content)
+        if not isinstance(data, dict):
+            return None
+        strengths = [str(item) for item in data.get("strengths", []) if str(item).strip()][:4]
+        weaknesses = [str(item) for item in data.get("weaknesses", []) if str(item).strip()][:4]
+        follow_up = str(data.get("follow_up", "")).strip()
+        if not strengths and not weaknesses and not follow_up:
+            return None
+        return {
+            "strengths": strengths,
+            "weaknesses": weaknesses,
+            "follow_up": follow_up,
+        }
+
+    def summarize_interview(
+        self,
+        candidate_name: str,
+        job: JobRequirements,
+        scores: list[float],
+        overall: float,
+        recommendation: str,
+        strengths: list[str],
+        weaknesses: list[str],
+    ) -> str | None:
+        user = prompts.INTERVIEW_SUMMARY_USER.format(
+            job_title=job.title,
+            candidate_name=candidate_name,
+            scores="、".join(f"{score:.1f}" for score in scores),
+            overall_score=f"{overall:.1f}",
+            recommendation=recommendation,
+            strengths="；".join(strengths[:3]) or "无明显优势",
+            weaknesses="；".join(weaknesses[:3]) or "暂无明显风险",
+        )
+        return self._chat(prompts.INTERVIEW_SUMMARY_SYSTEM, user)
+
 
 def _parse_json(content: str):
     content = re.sub(r"^```(?:json)?|```$", "", content.strip(), flags=re.MULTILINE).strip()

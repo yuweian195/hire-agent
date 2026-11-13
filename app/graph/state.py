@@ -11,6 +11,7 @@ class ScreeningState(TypedDict, total=False):
     created_at: str
     llm_mode: str
     repository: Any
+    stage: str
 
     resume_text: str
     job: dict

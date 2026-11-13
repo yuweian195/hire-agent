@@ -1,0 +1,6 @@
+﻿排名,候选人,综合评分,结论,匹配度,缺失技能,筛选编号
+1,张伟,9.13,recommend,98%,,c6c6c0acd476
+2,赵敏,7.36,hold,78%,Spring Cloud、Kafka,7b98c33b9274
+3,陈晨,6.39,hold,42%,Java、Spring Boot、Spring Cloud、MySQL、Redis、Kafka、微服务,34cbf004e61a
+4,李娜,6.25,hold,48%,Java、Spring Boot、Spring Cloud、Redis、Kafka、微服务,d0e7fc333f43
+5,王强,4.75,reject,36%,Spring Cloud、Redis、Kafka、微服务,025277434df0

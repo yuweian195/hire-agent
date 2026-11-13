@@ -14,6 +14,20 @@ class Recommendation(StrEnum):
     REJECT = "reject"
 
 
+class ScreeningStage(StrEnum):
+    SCREENING = "screening"
+    INTERVIEW = "interview"
+    OFFER = "offer"
+    REJECTED = "rejected"
+    TALENT_POOL = "talent_pool"
+
+
+class InterviewRecommendation(StrEnum):
+    PASS = "pass"
+    HOLD = "hold"
+    REJECT = "reject"
+
+
 class WorkExperience(BaseModel):
     company: str = ""
     title: str = ""
@@ -103,6 +117,72 @@ class ScreenRequest(BaseModel):
     jd_text: str | None = None
 
 
+class BatchScreenRequest(BaseModel):
+    job_id: str
+    resume_texts: list[str] = Field(min_length=1, max_length=50)
+
+
+class BatchScreenItem(BaseModel):
+    rank: int
+    screening: ScreeningResponse
+
+
+class BatchScreenResponse(BaseModel):
+    job_id: str
+    job_title: str
+    total: int
+    items: list[BatchScreenItem] = Field(default_factory=list)
+
+
+class InterviewItem(BaseModel):
+    question: str = Field(min_length=4)
+    answer: str = Field(min_length=1)
+    category: str = ""
+    intent: str = ""
+
+
+class InterviewEvaluateRequest(BaseModel):
+    items: list[InterviewItem] = Field(min_length=1, max_length=20)
+    job_id: str | None = None
+    jd_text: str | None = None
+    candidate_name: str = ""
+    resume_text: str = ""
+
+
+class AnswerEvaluation(BaseModel):
+    question: str
+    answer: str
+    score: float
+    dimensions: dict[str, float] = Field(default_factory=dict)
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+    follow_up: str = ""
+
+
+class InterviewReport(BaseModel):
+    id: str
+    candidate_name: str
+    job_id: str
+    job_title: str
+    overall_score: float
+    recommendation: InterviewRecommendation
+    answer_evaluations: list[AnswerEvaluation] = Field(default_factory=list)
+    summary: str = ""
+    llm_mode: str = "offline"
+    trace: list[TraceStep] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class InterviewListItem(BaseModel):
+    id: str
+    candidate_name: str
+    job_id: str
+    job_title: str
+    overall_score: float
+    recommendation: InterviewRecommendation
+    created_at: datetime
+
+
 class ScreeningResponse(BaseModel):
     id: str
     candidate_name: str
@@ -120,6 +200,7 @@ class ScreeningResponse(BaseModel):
     parsed_resume: ParsedResume
     trace: list[TraceStep] = Field(default_factory=list)
     llm_mode: str = "offline"
+    stage: ScreeningStage = ScreeningStage.SCREENING
     created_at: datetime = Field(default_factory=datetime.now)
 
 
@@ -131,7 +212,12 @@ class ScreeningListItem(BaseModel):
     total_score: float
     recommendation: Recommendation
     match_rate: float
+    stage: ScreeningStage = ScreeningStage.SCREENING
     created_at: datetime
+
+
+class StageUpdateRequest(BaseModel):
+    stage: ScreeningStage
 
 
 class HealthResponse(BaseModel):
