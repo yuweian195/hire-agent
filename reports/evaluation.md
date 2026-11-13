@@ -6,17 +6,17 @@
 
 | 简历 | 岗位 | 期望结论 | 实际结论 | 分数 | 分数区间 | 匹配度 | 耗时 |
 |---|---|---|---|---:|---|---:|---:|
-| zhangwei.txt | 高级 Java 工程师 | recommend | recommend ✅ | 9.13 ✅ | 8.5-9.8 | 98% | 29 ms |
+| zhangwei.txt | 高级 Java 工程师 | recommend | recommend ✅ | 9.13 ✅ | 8.5-9.8 | 98% | 27 ms |
 | zhaomin.txt | 高级 Java 工程师 | hold | hold ✅ | 7.36 ✅ | 6.5-8.0 | 78% | 9 ms |
-| lina.txt | 高级 Java 工程师 | hold | hold ✅ | 6.25 ✅ | 5.8-7.0 | 48% | 11 ms |
-| wangqiang.txt | 高级 Java 工程师 | reject | reject ✅ | 4.75 ✅ | 3.5-5.5 | 36% | 10 ms |
-| chenchen.txt | AI 应用工程师（LLM） | recommend | recommend ✅ | 8.89 ✅ | 8.0-9.5 | 97% | 11 ms |
+| lina.txt | 高级 Java 工程师 | hold | hold ✅ | 6.25 ✅ | 5.8-7.0 | 48% | 9 ms |
+| wangqiang.txt | 高级 Java 工程师 | reject | reject ✅ | 4.75 ✅ | 3.5-5.5 | 36% | 7 ms |
+| chenchen.txt | AI 应用工程师（LLM） | recommend | recommend ✅ | 8.89 ✅ | 8.0-9.5 | 97% | 8 ms |
 
 ## 汇总
 
 - 决策准确率：**5/5（100%）**
 - 分数区间命中：**5/5（100%）**
-- 平均单份耗时：**14 ms**
-- P95 耗时：**29 ms**
+- 平均单份耗时：**12 ms**
+- P95 耗时：**27 ms**
 
 > 评估集为合成简历，标签由人工按岗位要求标注；分数区间用于检查评分量级是否合理。

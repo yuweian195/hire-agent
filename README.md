@@ -6,9 +6,11 @@
 ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)
 ![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B)
 
-面向中小团队招聘初筛场景的智能筛选系统。输入简历与目标岗位，输出六维评分、人岗匹配度、技能缺口、合规提示和针对性面试题；全流程由 LangGraph 状态图编排，并保留每个节点的执行轨迹。
+面向中小团队招聘场景的智能筛选与面试评估系统。覆盖简历解析、六维评分、人岗匹配、批量排名、面试回答评估和候选人流程管理；全流程由 LangGraph 状态图编排，并保留每个节点的执行轨迹。
 
 ![HireAgent 工作台](docs/screenshots/workbench.png)
+
+![面试评估](docs/screenshots/interview-evaluation.png)
 
 > 仓库内简历与岗位均为合成样本，用于可复现的工程评估；接入真实数据时请替换 `data/` 目录，并遵守候选人隐私与数据合规要求。
 
@@ -30,6 +32,10 @@ HireAgent 把这条链路做成一个完整的单机服务：规则负责可解�
 - **条件路由**：`≥ 8.0` 推荐并生成面试题；`6.0–8.0` 待定；`< 6.0` 淘汰。路由逻辑在 LangGraph 条件边中显式表达。
 - **JD 合规检查**：识别性别、年龄、第一学历、婚育、户籍等歧视性条件，并从评分依据中剔除。
 - **面试题生成**：围绕候选人已命中技能、缺失技能和项目经历生成技术题、项目题、行为题、场景题与岗位理解题。
+- **面试回答评估**：按相关性、深度、结构、表达四个维度逐题评分，输出通过/待定/不通过、优势、风险与追问建议。
+- **批量筛选与排名**：一次导入多份简历，按综合评分排名并导出 CSV，适合校招/社招批量初筛。
+- **候选人流程管理**：支持初筛、面试中、Offer、已淘汰、人才库五种状态，记录可回溯。
+- **报告导出**：筛选报告与面试报告均可导出 Markdown，便于归档和面试评审。
 - **可选的 LLM 增强**：兼容 OpenAI / DeepSeek / 通义等 OpenAI-compatible 接口；未配置 Key 时自动使用离线规则模式。
 - **完整工程化**：FastAPI 接口、Streamlit 工作台、SQLite 持久化、pytest、Ruff、Docker Compose、GitHub Actions。
 
@@ -40,17 +46,24 @@ flowchart LR
     U[HR / 招聘方] --> UI[Streamlit 工作台]
     U --> API[FastAPI]
     UI --> S[ScreeningService]
+    UI --> I[InterviewService]
     API --> S
-    S --> G[LangGraph 状态图]
+    API --> I
+    S --> G[筛选 LangGraph]
+    I --> IG[面试评估 LangGraph]
     G --> P[简历解析]
     G --> K[技能匹配]
     G --> R[六维评分]
     G --> M[人岗匹配]
     G --> C[合规检查]
     G --> Q[面试题生成]
+    IG --> A[逐题评分]
+    IG --> B[汇总结论]
     G -. 可选 .-> L[LLM Client]
+    IG -. 可选 .-> L
     L -. OpenAI-compatible .-> E[外部模型]
     S --> DB[(SQLite)]
+    I --> DB
     P --> D[合成简历 / 岗位数据]
 ```
 
@@ -72,6 +85,19 @@ flowchart TD
 ```
 
 每个节点都会记录耗时与摘要，工作台中可以直接展开“Agent 执行轨迹”查看。
+
+面试评估使用独立的 LangGraph 子图：
+
+```mermaid
+flowchart TD
+    A[prepare_context<br/>加载岗位与候选人] --> B[evaluate_answers<br/>逐题评估]
+    B --> C[aggregate<br/>汇总平均分与结论]
+    C --> D[generate_summary<br/>生成面试结论]
+    D --> E[save_report<br/>保存报告]
+    E --> F[(SQLite)]
+```
+
+单题评分维度：相关性 35%、深度 30%、结构 20%、表达 15%。默认 `≥ 7.5 通过 / ≥ 6.0 待定`，可通过环境变量调整。
 
 ## 评分模型
 
@@ -124,7 +150,7 @@ LLM_BASE_URL=https://api.deepseek.com/v1
 LLM_MODEL=deepseek-chat
 ```
 
-配置后，**评语与面试题**会由 LLM 生成；**六维分数仍然由规则计算**，保证可复现、可测试。未配置 Key 或调用失败时，自动回退到离线模板。
+配置后，**评语、面试题与面试反馈**会由 LLM 生成；**筛选与面试分数仍然由规则计算**，保证可复现、可测试。未配置 Key 或调用失败时，自动回退到离线模板。
 
 ## API 示例
 
@@ -161,8 +187,15 @@ curl -X POST http://127.0.0.1:8000/screen \
 | GET | `/jobs` | 岗位列表 |
 | POST | `/screen` | 文本简历筛选 |
 | POST | `/screen/upload` | 文件上传筛选（PDF/DOCX/TXT） |
+| POST | `/screen/batch` | 批量筛选并返回排名 |
 | GET | `/screenings` | 最近筛选记录 |
 | GET | `/screenings/{id}` | 单条筛选详情 |
+| GET | `/screenings/{id}/report` | 导出筛选报告（Markdown） |
+| PATCH | `/screenings/{id}/stage` | 更新候选人流程状态 |
+| POST | `/interview/evaluate` | 面试回答评估 |
+| GET | `/interviews` | 最近面试报告 |
+| GET | `/interview/{id}` | 单份面试报告 |
+| GET | `/interview/{id}/report` | 导出面试报告（Markdown） |
 
 ## 评估结果
 
@@ -172,8 +205,8 @@ curl -X POST http://127.0.0.1:8000/screen \
 |---|---|
 | 决策准确率 | **5/5（100%）** |
 | 分数区间命中 | **5/5（100%）** |
-| 平均单份耗时 | **14 ms** |
-| P95 耗时 | **29 ms** |
+| 平均单份耗时 | **12 ms** |
+| P95 耗时 | **27 ms** |
 
 ```bash
 python scripts/evaluate.py
@@ -191,28 +224,40 @@ hire-agent/
 │   ├── schemas.py             # API / 工作流共享模型
 │   ├── db.py                  # SQLite 仓储
 │   ├── graph/
-│   │   ├── state.py           # LangGraph 状态定义
-│   │   ├── nodes.py           # 9 个工作流节点
-│   │   └── workflow.py        # 图构建与编译
+│   │   ├── state.py           # 筛选状态定义
+│   │   ├── nodes.py           # 9 个筛选节点
+│   │   ├── workflow.py        # 筛选图构建
+│   │   ├── interview_state.py # 面试评估状态
+│   │   ├── interview_nodes.py # 5 个面试评估节点
+│   │   └── interview_workflow.py
 │   ├── tools/
 │   │   ├── resume_parser.py   # PDF/DOCX/TXT 解析与结构化
 │   │   ├── skill_matcher.py   # 技能库与匹配
 │   │   ├── scorer.py          # 六维评分
 │   │   ├── jd_matcher.py      # 人岗匹配
 │   │   ├── compliance.py      # JD 合规检查
-│   │   └── question_generator.py
+│   │   ├── question_generator.py
+│   │   └── answer_evaluator.py # 面试回答四维评分
 │   ├── llm/
 │   │   ├── client.py          # OpenAI-compatible 客户端 + 降级
 │   │   └── prompts.py
-│   └── services/screening.py  # 业务编排
-├── ui/streamlit_app.py        # 招聘工作台
+│   └── services/
+│       ├── screening.py       # 筛选业务编排
+│       ├── interview.py       # 面试评估编排
+│       └── reporting.py       # Markdown 报告导出
+├── ui/streamlit_app.py        # 招聘工作台（筛选/批量/面试/候选人/岗位）
 ├── data/
 │   ├── jobs/                  # 岗位 JD
 │   ├── resumes/               # 合成简历
+│   ├── interviews/            # 面试问答样本
 │   └── fixtures/              # 评估标签
-├── scripts/evaluate.py
-├── tests/                     # 15 个单元/接口测试
-├── reports/evaluation.md
+├── scripts/
+│   ├── evaluate.py            # 离线评估
+│   └── batch_screen.py        # 批量筛选 CLI
+├── tests/                     # 22 个单元/接口测试
+├── reports/
+│   ├── evaluation.md
+│   └── batch_results.csv
 ├── Dockerfile
 ├── docker-compose.yml
 └── .github/workflows/ci.yml
@@ -229,15 +274,18 @@ GitHub Actions 在每次 push / PR 时执行 Ruff 与 pytest。
 
 ## 设计取舍
 
-- **数值用规则，语言用 LLM**：评分必须稳定、可解释、可单测；LLM 只负责评语和面试题。这样既保留大模型的语言能力，又避免“同样简历两次评分不同”。
+- **数值用规则，语言用 LLM**：筛选评分与面试评分都必须稳定、可解释、可单测；LLM 只负责评语、面试题与反馈。这样既保留大模型的语言能力，又避免“同样回答两次评分不同”。
 - **先做技能词典，不先上向量检索**：技能匹配需要可审计的命中/缺失列表；向量召回适合保留到 JD 语义匹配阶段再引入。
 - **SQLite 而不是 PostgreSQL**：单机工作台足够，部署成本低；仓储层已隔离，替换数据库不影响业务流程。
-- **默认离线可跑**：没有 API Key 也能完成完整筛选与测试，降低部署门槛，也方便 CI。
-- **明确边界**：当前版本聚焦单份简历筛选，不含多租户、鉴权、异步队列、批量导入与监控告警；这些属于生产化阶段。
+- **默认离线可跑**：没有 API Key 也能完成完整筛选、面试评估与测试，降低部署门槛，也方便 CI。
+- **明确边界**：当前版本不含多租户、鉴权、异步队列、简历去重与监控告警；这些属于生产化阶段。
 
 ## Roadmap
 
-- [ ] 简历批量导入与去重
+- [x] 批量筛选、排名与 CSV 导出
+- [x] 面试回答评估与面试报告
+- [x] 候选人流程状态管理
+- [ ] 简历批量去重
 - [ ] JD / 简历向量召回与重排
 - [ ] 评分校准：引入人工反馈与标注集
 - [ ] 多租户、鉴权与操作审计
@@ -246,6 +294,6 @@ GitHub Actions 在每次 push / PR 时执行 Ruff 与 pytest。
 
 ## 说明
 
-HireAgent 面向中小团队招聘初筛场景，提供可本地部署的完整实现：规则评分保证可解释与可复现，LLM 仅用于语言增强。
+HireAgent 面向中小团队招聘场景，提供从简历初筛到面试评估的完整本地实现：规则评分保证可解释与可复现，LLM 仅用于语言增强。
 
 仓库内简历、岗位与评估标签均为合成数据，用于可复现的工程评估；接入生产数据时请替换 `data/` 目录，并遵守候选人隐私与数据合规要求。欢迎通过 Issue 交流评分模型与 Agent 工作流的设计。
