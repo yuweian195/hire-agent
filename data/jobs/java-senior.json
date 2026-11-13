@@ -1,0 +1,18 @@
+{
+  "id": "java-senior",
+  "title": "高级 Java 工程师",
+  "department": "交易技术部",
+  "seniority": "高级",
+  "min_years": 5,
+  "education": "本科",
+  "salary_min": 30000,
+  "salary_max": 45000,
+  "required_skills": ["Java", "Spring Boot", "Spring Cloud", "MySQL", "Redis", "Kafka", "微服务"],
+  "preferred_skills": ["Docker", "Kubernetes", "高并发", "分布式事务"],
+  "responsibilities": [
+    "负责交易中台核心服务的架构设计与研发",
+    "主导高并发场景下的性能优化与稳定性治理",
+    "参与技术方案评审，推动跨团队项目落地"
+  ],
+  "description": "交易技术部高级 Java 工程师，负责订单、库存、结算等核心链路，要求具备大型分布式系统设计与高并发治理经验。"
+}

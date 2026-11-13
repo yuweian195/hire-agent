@@ -1,0 +1,18 @@
+{
+  "id": "llm-app",
+  "title": "AI 应用工程师（LLM）",
+  "department": "智能应用部",
+  "seniority": "中级",
+  "min_years": 3,
+  "education": "本科",
+  "salary_min": 25000,
+  "salary_max": 40000,
+  "required_skills": ["Python", "FastAPI", "LangGraph", "RAG", "向量数据库", "Prompt Engineering"],
+  "preferred_skills": ["Docker", "Kubernetes", "LLM", "评测"],
+  "responsibilities": [
+    "负责企业级 RAG 与 Agent 应用的方案设计与落地",
+    "建设检索、重排、生成链路的评测体系",
+    "与业务团队协作，将大模型能力嵌入真实工作流"
+  ],
+  "description": "智能应用部 AI 应用工程师，负责知识库问答、文档审查等 Agent 产品，要求具备 LangGraph/RAG 工程落地经验。"
+}
