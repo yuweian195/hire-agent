@@ -124,6 +124,7 @@ cd web
 npm install
 npm run build
 cd ..
+python scripts/seed_demo.py
 uvicorn app.main:app --reload
 ```
 
@@ -272,7 +273,8 @@ hire-agent/
 │   └── fixtures/              # 评估标签
 ├── scripts/
 │   ├── evaluate.py            # 离线评估
-│   └── batch_screen.py        # 批量筛选 CLI
+│   ├── batch_screen.py        # 批量筛选 CLI
+│   └── seed_demo.py           # 生成看板示例数据
 ├── ats-service/               # Java Spring Boot ATS 集成服务
 │   ├── src/main/java/...      # 岗位 / 候选人 / 筛选记录 API
 │   ├── src/test/java/...      # MockMvc 接口测试
