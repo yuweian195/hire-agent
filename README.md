@@ -73,6 +73,8 @@ HireAgent 把这条链路做成一个完整的单机服务：规则负责可解�
 
 总分 = Σ（维度得分 × 权重）。阈值默认 `推荐 8.0 / 待定 6.0`，可通过环境变量调整。
 
+岗位 JSON 可以覆盖默认权重，例如 `"weights": {"skills": 0.35, "experience": 0.2, "projects": 0.2}`，系统会自动归一化；未提供时使用默认六维权重。默认 `REDACT_PII=true`，发送给 LLM 的内容使用“候选人”而不是真实姓名，联系方式不会进入 Prompt。
+
 ## 快速开始
 
 ```bash
@@ -250,7 +252,7 @@ hire-agent/
 │   ├── src/test/java/...      # MockMvc 接口测试
 │   ├── pom.xml
 │   └── Dockerfile
-├── tests/                     # 25 个 Python 测试
+├── tests/                     # 26 个 Python 测试
 ├── reports/
 │   ├── evaluation.md
 │   └── batch_results.csv
@@ -266,7 +268,7 @@ pytest -q
 ruff check app ui tests scripts
 ```
 
-GitHub Actions 在每次 push / PR 时执行 Ruff、pytest，以及 Java ATS 的 Maven 测试（共 25 个 Python 测试 + 5 个 Java 测试）。
+GitHub Actions 在每次 push / PR 时执行 Ruff、pytest，以及 Java ATS 的 Maven 测试（共 26 个 Python 测试 + 5 个 Java 测试）。
 
 ## 设计取舍
 
@@ -280,6 +282,12 @@ GitHub Actions 在每次 push / PR 时执行 Ruff、pytest，以及 Java ATS 的
 ## 项目状态
 
 当前版本为完整可运行的实现：Python Agent 负责简历解析、六维评分、批量排名与面试评估；Java Spring Boot ATS 服务负责岗位、候选人与筛选记录。两套测试与 CI 均已通过，仓库中的功能可直接运行。
+
+## 工程边界
+
+- 评估集为 5 份合成简历与 2 个岗位，指标用于评分回归检查，不代表真实招聘场景的泛化能力。
+- 当前交付为单机 SQLite + 同步链路，面向单团队部署；多租户、异步队列属于不同部署形态。
+- LLM 只参与评语、面试题与面试反馈；生产使用需补充 token/延迟监控与 Prompt 版本管理。
 
 ## 说明
 

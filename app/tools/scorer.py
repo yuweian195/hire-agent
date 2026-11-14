@@ -243,10 +243,26 @@ def score_potential(parsed: ParsedResume) -> DimensionScore:
     )
 
 
+def resolve_weights(job: JobRequirements) -> dict[str, float]:
+    """Normalize job-specific weights; fall back to the default model."""
+    if not job.weights:
+        return dict(WEIGHTS)
+    custom = {
+        key: float(value)
+        for key, value in job.weights.items()
+        if key in WEIGHTS and isinstance(value, (int, float)) and value > 0
+    }
+    total = sum(custom.values())
+    if total <= 0:
+        return dict(WEIGHTS)
+    return {key: round(custom.get(key, 0.0) / total, 4) for key in WEIGHTS}
+
+
 def evaluate_dimensions(
     parsed: ParsedResume, job: JobRequirements, match: SkillMatch
 ) -> list[DimensionScore]:
-    return [
+    weights = resolve_weights(job)
+    dimensions = [
         score_education(parsed, job),
         score_experience(parsed, job),
         score_skills(parsed, match),
@@ -254,6 +270,9 @@ def evaluate_dimensions(
         score_stability(parsed),
         score_potential(parsed),
     ]
+    for item in dimensions:
+        item.weight = weights[item.key]
+    return dimensions
 
 
 def weighted_total(scores: list[DimensionScore]) -> float:

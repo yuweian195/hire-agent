@@ -1,7 +1,7 @@
 import pytest
 
-from app.schemas import Recommendation, ScreenRequest
-from app.tools.scorer import WEIGHTS
+from app.schemas import JobRequirements, Recommendation, ScreenRequest
+from app.tools.scorer import WEIGHTS, resolve_weights
 
 
 def test_dimension_weights_sum_to_one():
@@ -23,6 +23,20 @@ def test_stronger_candidate_scores_higher(service, read_resume):
     assert strong.recommendation == Recommendation.RECOMMEND
     assert medium.recommendation == Recommendation.HOLD
     assert weak.recommendation == Recommendation.REJECT
+
+
+def test_custom_job_weights_are_normalized():
+    job = JobRequirements(
+        id="custom",
+        title="技能优先岗位",
+        weights={"skills": 3, "experience": 1, "projects": 0},
+    )
+    weights = resolve_weights(job)
+
+    assert weights["skills"] == 0.75
+    assert weights["experience"] == 0.25
+    assert weights["projects"] == 0.0
+    assert sum(weights.values()) == 1.0
 
 
 def test_six_dimensions_and_score_bounds(service, read_resume):

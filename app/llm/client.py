@@ -79,7 +79,7 @@ class LLMClient:
         user = prompts.SUMMARY_USER.format(
             job_title=job.title,
             job_requirements="、".join(job.required_skills),
-            candidate_name=parsed.name or "候选人",
+            candidate_name="候选人" if self.settings.redact_pii else (parsed.name or "候选人"),
             education=parsed.education_level or "学历未识别",
             years=f"{parsed.years_experience:g}",
             skills="、".join(parsed.skills[:10]) or "未识别",
@@ -166,9 +166,10 @@ class LLMClient:
         strengths: list[str],
         weaknesses: list[str],
     ) -> str | None:
+        safe_name = "候选人" if self.settings.redact_pii else candidate_name
         user = prompts.INTERVIEW_SUMMARY_USER.format(
             job_title=job.title,
-            candidate_name=candidate_name,
+            candidate_name=safe_name,
             scores="、".join(f"{score:.1f}" for score in scores),
             overall_score=f"{overall:.1f}",
             recommendation=recommendation,

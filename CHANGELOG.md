@@ -13,6 +13,8 @@
 - 架构文档、面试评估截图、CONTRIBUTING 与 LICENSE。
 - Java Spring Boot 3 ATS 集成服务（岗位 / 候选人 / 筛选记录，H2 + MockMvc）。
 - Python `AtsClient`：通过 `ATS_BASE_URL` 加载岗位并回写筛选结果，失败自动回退。
+- 岗位级评分权重：岗位 JSON 可覆盖六维权重并自动归一化。
+- LLM PII 脱敏：默认不把候选人姓名/联系方式写入 Prompt。
 
 ### Changed
 

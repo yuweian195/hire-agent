@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     ats_base_url: str = ""
     ats_timeout: float = 5.0
 
+    # Do not send candidate name/contact details to the LLM by default.
+    redact_pii: bool = True
+
     # Any OpenAI-compatible endpoint works: OpenAI, DeepSeek, Qwen, Moonshot...
     llm_api_key: str = ""
     llm_base_url: str = "https://api.openai.com/v1"

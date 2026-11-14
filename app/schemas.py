@@ -63,6 +63,7 @@ class JobRequirements(BaseModel):
     preferred_skills: list[str] = Field(default_factory=list)
     responsibilities: list[str] = Field(default_factory=list)
     description: str = ""
+    weights: dict[str, float] | None = None
 
 
 class DimensionScore(BaseModel):
