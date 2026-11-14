@@ -34,3 +34,8 @@ Thumbs.db
 # Java ATS service
 ats-service/target/
 ats-service/data/
+
+# TypeScript pipeline board
+web/node_modules/
+web/dist/
+web/.vite/

@@ -7,9 +7,10 @@ from typing import Annotated
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
-from app.config import get_settings
+from app.config import BASE_DIR, get_settings
 from app.db import get_repository
 from app.schemas import (
     BatchScreenRequest,
@@ -167,3 +168,13 @@ def get_screening_report(screening_id: str) -> PlainTextResponse:
             "Content-Disposition": f'attachment; filename="screening-{screening_id}.md"'
         },
     )
+
+
+# TypeScript HR pipeline board (built with `npm run build`).
+BOARD_DIST = BASE_DIR / "web" / "dist"
+if BOARD_DIST.exists():
+    app.mount("/board", StaticFiles(directory=BOARD_DIST, html=True), name="board")
+
+    @app.get("/", include_in_schema=False)
+    def board_root() -> RedirectResponse:
+        return RedirectResponse(url="/board/")

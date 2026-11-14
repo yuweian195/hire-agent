@@ -14,7 +14,9 @@
 
 <p align="center"><a href="docs/screenshots/interview-evaluation.png"><img src="docs/screenshots/interview-evaluation.png" alt="面试评估" width="900"></a></p>
 
-<p align="center"><a href="docs/screenshots/workbench.png">查看工作台原图</a> · <a href="docs/screenshots/interview-evaluation.png">查看面试评估原图</a></p>
+<p align="center"><a href="docs/screenshots/pipeline-board.png"><img src="docs/screenshots/pipeline-board.png" alt="TypeScript 招聘看板" width="900"></a></p>
+
+<p align="center"><a href="docs/screenshots/workbench.png">查看工作台原图</a> · <a href="docs/screenshots/interview-evaluation.png">查看面试评估原图</a> · <a href="docs/screenshots/pipeline-board.png">查看招聘看板原图</a></p>
 
 > 仓库内简历与岗位均为合成样本，用于可复现的工程评估；接入真实数据时请替换 `data/` 目录，并遵守候选人隐私与数据合规要求。
 
@@ -42,6 +44,7 @@ HireAgent 把这条链路做成一个完整的单机服务：规则负责可解�
 - **报告导出**：筛选报告与面试报告均可导出 Markdown，便于归档和面试评审。
 - **可选的 LLM 增强**：兼容 OpenAI / DeepSeek / 通义等 OpenAI-compatible 接口；未配置 Key 时自动使用离线规则模式。
 - **Java ATS 集成**：Spring Boot 3 + H2 管理岗位、候选人与筛选记录，Python Agent 通过 HTTP 接入；未配置时自动回退本地数据。
+- **TypeScript 招聘看板**：React + Vite 五列 Kanban，展示候选人流程、评分与详情，支持推进/退回阶段。
 - **完整工程化**：FastAPI、Streamlit、SQLite、Java Spring Boot、pytest、JUnit、Ruff、Docker Compose、GitHub Actions。
 
 ## 架构
@@ -102,6 +105,18 @@ uvicorn app.main:app --reload
 
 - Swagger：`http://127.0.0.1:8000/docs`
 - 健康检查：`GET /health`
+
+TypeScript 招聘看板：
+
+```bash
+cd web
+npm install
+npm run build
+cd ..
+uvicorn app.main:app --reload
+```
+
+打开 `http://127.0.0.1:8000/board/`。开发模式：`cd web && npm run dev`（默认连接 `http://127.0.0.1:8000`）。
 
 ## Java ATS 集成服务（可选）
 
@@ -252,6 +267,11 @@ hire-agent/
 │   ├── src/test/java/...      # MockMvc 接口测试
 │   ├── pom.xml
 │   └── Dockerfile
+├── web/                       # TypeScript + React 招聘看板
+│   ├── src/App.tsx
+│   ├── src/api.ts
+│   ├── src/styles.css
+│   └── package.json
 ├── tests/                     # 26 个 Python 测试
 ├── reports/
 │   ├── evaluation.md
@@ -268,7 +288,7 @@ pytest -q
 ruff check app ui tests scripts
 ```
 
-GitHub Actions 在每次 push / PR 时执行 Ruff、pytest，以及 Java ATS 的 Maven 测试（共 26 个 Python 测试 + 5 个 Java 测试）。
+GitHub Actions 在每次 push / PR 时执行 Ruff、pytest、Java ATS 的 Maven 测试，以及 TypeScript 看板构建（共 26 个 Python 测试 + 5 个 Java 测试）。
 
 ## 设计取舍
 
@@ -281,7 +301,7 @@ GitHub Actions 在每次 push / PR 时执行 Ruff、pytest，以及 Java ATS 的
 
 ## 项目状态
 
-当前版本为完整可运行的实现：Python Agent 负责简历解析、六维评分、批量排名与面试评估；Java Spring Boot ATS 服务负责岗位、候选人与筛选记录。两套测试与 CI 均已通过，仓库中的功能可直接运行。
+当前版本为完整可运行的实现：Python Agent 负责简历解析、六维评分、批量排名与面试评估；Java Spring Boot ATS 服务负责岗位、候选人与筛选记录；TypeScript 招聘看板负责流程展示与推进。三套构建与 CI 均已通过，仓库中的功能可直接运行。
 
 ## 工程边界
 
