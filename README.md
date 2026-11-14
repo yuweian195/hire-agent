@@ -4,6 +4,8 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![LangGraph](https://img.shields.io/badge/Agent-LangGraph-1C3C3C)
 ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)
+![Java](https://img.shields.io/badge/Java-21-ED8B00)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F)
 ![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B)
 
 面向中小团队招聘场景的智能筛选与面试评估系统。覆盖简历解析、六维评分、人岗匹配、批量排名、面试回答评估和候选人流程管理；全流程由 LangGraph 状态图编排，并保留每个节点的执行轨迹。
@@ -39,7 +41,8 @@ HireAgent 把这条链路做成一个完整的单机服务：规则负责可解�
 - **候选人流程管理**：支持初筛、面试中、Offer、已淘汰、人才库五种状态，记录可回溯。
 - **报告导出**：筛选报告与面试报告均可导出 Markdown，便于归档和面试评审。
 - **可选的 LLM 增强**：兼容 OpenAI / DeepSeek / 通义等 OpenAI-compatible 接口；未配置 Key 时自动使用离线规则模式。
-- **完整工程化**：FastAPI 接口、Streamlit 工作台、SQLite 持久化、pytest、Ruff、Docker Compose、GitHub Actions。
+- **Java ATS 集成**：Spring Boot 3 + H2 管理岗位、候选人与筛选记录，Python Agent 通过 HTTP 接入；未配置时自动回退本地数据。
+- **完整工程化**：FastAPI、Streamlit、SQLite、Java Spring Boot、pytest、JUnit、Ruff、Docker Compose、GitHub Actions。
 
 ## 架构
 
@@ -97,6 +100,34 @@ uvicorn app.main:app --reload
 
 - Swagger：`http://127.0.0.1:8000/docs`
 - 健康检查：`GET /health`
+
+## Java ATS 集成服务（可选）
+
+`ats-service/` 是一个独立的 Java Spring Boot 3 服务，负责岗位、候选人和筛选记录的持久化，使用 H2 文件数据库。它模拟企业招聘系统中的 ATS 集成层：
+
+```bash
+cd ats-service
+mvn spring-boot:run
+# 服务地址 http://127.0.0.1:8080
+```
+
+Python 侧配置 `ATS_BASE_URL` 后，会优先从 Java 服务加载岗位，并在筛选完成后回写结果：
+
+```bash
+ATS_BASE_URL=http://127.0.0.1:8080 uvicorn app.main:app --reload
+```
+
+Java 服务不可用时自动回退到 `data/jobs` 与本地 SQLite，不影响主链路。接口包括：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/jobs` | 岗位列表 |
+| POST | `/api/candidates` | 创建候选人 |
+| POST | `/api/screenings` | 写入筛选结果 |
+| PATCH | `/api/screenings/{id}/stage` | 更新候选人流程状态 |
+| GET | `/api/health` | Java 服务健康检查 |
+
+`docker compose up --build` 会同时启动 Java ATS（8080）、API（8000）与工作台（8501）。
 
 ## 配置真实 LLM（可选）
 
@@ -199,6 +230,8 @@ hire-agent/
 │   ├── llm/
 │   │   ├── client.py          # OpenAI-compatible 客户端 + 降级
 │   │   └── prompts.py
+│   ├── integrations/
+│   │   └── ats_client.py      # Java ATS 客户端（可选）
 │   └── services/
 │       ├── screening.py       # 筛选业务编排
 │       ├── interview.py       # 面试评估编排
@@ -212,7 +245,12 @@ hire-agent/
 ├── scripts/
 │   ├── evaluate.py            # 离线评估
 │   └── batch_screen.py        # 批量筛选 CLI
-├── tests/                     # 22 个单元/接口测试
+├── ats-service/               # Java Spring Boot ATS 集成服务
+│   ├── src/main/java/...      # 岗位 / 候选人 / 筛选记录 API
+│   ├── src/test/java/...      # MockMvc 接口测试
+│   ├── pom.xml
+│   └── Dockerfile
+├── tests/                     # 25 个 Python 测试
 ├── reports/
 │   ├── evaluation.md
 │   └── batch_results.csv
@@ -228,19 +266,20 @@ pytest -q
 ruff check app ui tests scripts
 ```
 
-GitHub Actions 在每次 push / PR 时执行 Ruff 与 pytest。
+GitHub Actions 在每次 push / PR 时执行 Ruff、pytest，以及 Java ATS 的 Maven 测试（共 25 个 Python 测试 + 5 个 Java 测试）。
 
 ## 设计取舍
 
 - **数值用规则，语言用 LLM**：筛选评分与面试评分都必须稳定、可解释、可单测；LLM 只负责评语、面试题与反馈。这样既保留大模型的语言能力，又避免“同样回答两次评分不同”。
 - **先做技能词典，不先上向量检索**：技能匹配需要可审计的命中/缺失列表；向量召回适合保留到 JD 语义匹配阶段再引入。
 - **SQLite 而不是 PostgreSQL**：单机工作台足够，部署成本低；仓储层已隔离，替换数据库不影响业务流程。
+- **Python Agent + Java ATS**：Python 负责 Agent、评分与工作流，Java Spring Boot 负责企业 ATS 集成；HTTP 解耦，Java 不可用时自动回退本地数据。
 - **默认离线可跑**：没有 API Key 也能完成完整筛选、面试评估与测试，降低部署门槛，也方便 CI。
 - **单机交付**：SQLite 单机版本开箱即用，仓储层已隔离；需要多租户或鉴权时可按部署环境替换，不影响现有主链路。
 
 ## 项目状态
 
-当前版本为完整可运行的单机实现：简历解析、六维评分、批量排名、面试评估、候选人流程状态与报告导出均已落地，测试与 CI 均已通过，仓库中的功能可直接运行。
+当前版本为完整可运行的实现：Python Agent 负责简历解析、六维评分、批量排名与面试评估；Java Spring Boot ATS 服务负责岗位、候选人与筛选记录。两套测试与 CI 均已通过，仓库中的功能可直接运行。
 
 ## 说明
 

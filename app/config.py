@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     database_path: Path = BASE_DIR / "data" / "hire_agent.db"
     jobs_dir: Path = BASE_DIR / "data" / "jobs"
 
+    # Optional Java Spring Boot ATS integration service.
+    ats_base_url: str = ""
+    ats_timeout: float = 5.0
+
     # Any OpenAI-compatible endpoint works: OpenAI, DeepSeek, Qwen, Moonshot...
     llm_api_key: str = ""
     llm_base_url: str = "https://api.openai.com/v1"
@@ -37,6 +41,10 @@ class Settings(BaseSettings):
     @property
     def llm_enabled(self) -> bool:
         return bool(self.llm_api_key.strip())
+
+    @property
+    def ats_enabled(self) -> bool:
+        return bool(self.ats_base_url.strip())
 
 
 @lru_cache(maxsize=1)

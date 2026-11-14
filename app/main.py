@@ -59,6 +59,7 @@ def health() -> HealthResponse:
         version=settings.version,
         llm_mode=service.llm.mode,
         jobs=len(service.list_jobs()),
+        ats="online" if service.ats is not None else "off",
     )
 
 

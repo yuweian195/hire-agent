@@ -123,7 +123,24 @@ SQLite 两张表：
 - **接入真实 LLM**：配置 `.env` 即可；如需多模型路由，在 `LLMClient` 内按任务选择模型。
 - **异步批处理**：`screen_batch` 目前同步执行，后续可替换为任务队列（Celery/RQ），API 返回任务 ID。
 
-## 6. 部署
+## 6. Java ATS 集成（可选）
+
+`ats-service/` 是独立的 Spring Boot 3 + H2 服务，负责岗位、候选人与筛选记录：
+
+- `JobEntity` / `CandidateEntity` / `ScreeningRecordEntity`；
+- `AtsService` 负责创建候选人、写入筛选结果、更新流程状态；
+- 提供 `/api/jobs`、`/api/candidates`、`/api/screenings` 等接口；
+- MockMvc + H2 内存库测试。
+
+Python 侧 `app/integrations/ats_client.py` 通过 `ATS_BASE_URL` 调用：
+
+1. `ScreeningService.list_jobs()` 优先加载 Java 岗位；
+2. 筛选完成后回写 `POST /api/screenings`；
+3. Java 不可用时记录 warning，自动回退 `data/jobs` 与 SQLite。
+
+Python 与 Java 仅通过 HTTP 解耦，Java 服务可以独立部署、替换或关闭。
+
+## 7. 部署
 
 - 单机：`streamlit run ui/streamlit_app.py` + `uvicorn app.main:app`。
 - 容器：`docker compose up --build`，API 8000，UI 8501。

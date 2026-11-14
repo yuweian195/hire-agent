@@ -225,3 +225,4 @@ class HealthResponse(BaseModel):
     version: str
     llm_mode: str
     jobs: int
+    ats: str = "off"

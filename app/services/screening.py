@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -10,6 +11,7 @@ from pathlib import Path
 from app.config import get_settings
 from app.db import ScreeningRepository, get_repository
 from app.graph.workflow import get_graph
+from app.integrations.ats_client import AtsClient
 from app.llm.client import LLMClient, get_llm_client
 from app.schemas import (
     BatchScreenItem,
@@ -24,6 +26,8 @@ from app.schemas import (
 )
 from app.tools.skill_matcher import extract_skills
 
+logger = logging.getLogger(__name__)
+
 
 class ScreeningService:
     def __init__(
@@ -31,12 +35,25 @@ class ScreeningService:
         repository: ScreeningRepository | None = None,
         llm: LLMClient | None = None,
         jobs_dir: Path | None = None,
+        ats: AtsClient | None = None,
     ) -> None:
+        settings = get_settings()
         self.repository = repository or get_repository()
         self.llm = llm or get_llm_client()
-        self.jobs_dir = Path(jobs_dir or get_settings().jobs_dir)
+        self.jobs_dir = Path(jobs_dir or settings.jobs_dir)
+        if ats is None and settings.ats_enabled:
+            ats = AtsClient(settings.ats_base_url, timeout=settings.ats_timeout)
+        self.ats = ats
 
     def list_jobs(self) -> list[JobRequirements]:
+        if self.ats is not None:
+            try:
+                remote = self.ats.list_jobs()
+                if remote:
+                    return remote
+            except Exception as exc:  # noqa: BLE001 - Java service is optional
+                logger.warning("ATS service unavailable, using local jobs: %s", exc)
+
         jobs: list[JobRequirements] = []
         if not self.jobs_dir.exists():
             return jobs
@@ -130,6 +147,11 @@ class ScreeningService:
             stage=ScreeningStage(final_state.get("stage", ScreeningStage.SCREENING.value)),
             created_at=created_at,
         )
+        if self.ats is not None:
+            try:
+                self.ats.push_screening(response, response.parsed_resume)
+            except Exception as exc:  # noqa: BLE001 - Java service is optional
+                logger.warning("Failed to push screening to ATS service: %s", exc)
         return response
 
     def screen_batch(self, payload: BatchScreenRequest) -> BatchScreenResponse:

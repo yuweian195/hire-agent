@@ -1,4 +1,11 @@
 services:
+  ats:
+    build: ./ats-service
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./ats-service/data:/app/data
+
   api:
     build: .
     ports:
@@ -6,8 +13,12 @@ services:
     env_file:
       - path: .env
         required: false
+    environment:
+      ATS_BASE_URL: http://ats:8080
     volumes:
       - ./data:/app/data
+    depends_on:
+      - ats
 
   ui:
     build: .
@@ -17,6 +28,8 @@ services:
     env_file:
       - path: .env
         required: false
+    environment:
+      ATS_BASE_URL: http://ats:8080
     volumes:
       - ./data:/app/data
     depends_on:
