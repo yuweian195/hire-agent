@@ -8,9 +8,11 @@
 
 面向中小团队招聘场景的智能筛选与面试评估系统。覆盖简历解析、六维评分、人岗匹配、批量排名、面试回答评估和候选人流程管理；全流程由 LangGraph 状态图编排，并保留每个节点的执行轨迹。
 
-![HireAgent 工作台](docs/screenshots/workbench.png)
+<p align="center"><a href="docs/screenshots/workbench.png"><img src="docs/screenshots/workbench.png" alt="HireAgent 工作台" width="900"></a></p>
 
-![面试评估](docs/screenshots/interview-evaluation.png)
+<p align="center"><a href="docs/screenshots/interview-evaluation.png"><img src="docs/screenshots/interview-evaluation.png" alt="面试评估" width="900"></a></p>
+
+<p align="center"><a href="docs/screenshots/workbench.png">查看工作台原图</a> · <a href="docs/screenshots/interview-evaluation.png">查看面试评估原图</a></p>
 
 > 仓库内简历与岗位均为合成样本，用于可复现的工程评估；接入真实数据时请替换 `data/` 目录，并遵守候选人隐私与数据合规要求。
 
@@ -41,61 +43,17 @@ HireAgent 把这条链路做成一个完整的单机服务：规则负责可解�
 
 ## 架构
 
-```mermaid
-flowchart LR
-    U[HR / 招聘方] --> UI[Streamlit 工作台]
-    U --> API[FastAPI]
-    UI --> S[ScreeningService]
-    UI --> I[InterviewService]
-    API --> S
-    API --> I
-    S --> G[筛选 LangGraph]
-    I --> IG[面试评估 LangGraph]
-    G --> P[简历解析]
-    G --> K[技能匹配]
-    G --> R[六维评分]
-    G --> M[人岗匹配]
-    G --> C[合规检查]
-    G --> Q[面试题生成]
-    IG --> A[逐题评分]
-    IG --> B[汇总结论]
-    G -. 可选 .-> L[LLM Client]
-    IG -. 可选 .-> L
-    L -. OpenAI-compatible .-> E[外部模型]
-    S --> DB[(SQLite)]
-    I --> DB
-    P --> D[合成简历 / 岗位数据]
-```
+<p align="center"><a href="docs/diagrams/architecture.svg"><img src="docs/diagrams/architecture.svg" alt="architecture" width="960"></a></p>
 
 ## Agent 工作流
 
-```mermaid
-flowchart TD
-    A[parse_resume<br/>解析简历] --> B[extract_skills<br/>提取技能]
-    B --> C[evaluate_dimensions<br/>六维评分]
-    C --> D[calculate_total_score<br/>加权汇总]
-    D --> E[match_jd<br/>人岗匹配]
-    E --> F[compliance_check<br/>JD 合规检查]
-    F --> H[generate_recommendation<br/>生成结论]
-    H -->|≥ 8.0 推荐| I[generate_questions<br/>生成面试题]
-    H -->|6.0–8.0 待定| J[save_results<br/>保存结果]
-    H -->|< 6.0 淘汰| J
-    I --> J
-    J --> K[(SQLite)]
-```
+<p align="center"><a href="docs/diagrams/workflow.svg"><img src="docs/diagrams/workflow.svg" alt="workflow" width="960"></a></p>
 
 每个节点都会记录耗时与摘要，工作台中可以直接展开“Agent 执行轨迹”查看。
 
 面试评估使用独立的 LangGraph 子图：
 
-```mermaid
-flowchart TD
-    A[prepare_context<br/>加载岗位与候选人] --> B[evaluate_answers<br/>逐题评估]
-    B --> C[aggregate<br/>汇总平均分与结论]
-    C --> D[generate_summary<br/>生成面试结论]
-    D --> E[save_report<br/>保存报告]
-    E --> F[(SQLite)]
-```
+<p align="center"><a href="docs/diagrams/interview-workflow.svg"><img src="docs/diagrams/interview-workflow.svg" alt="interview-workflow" width="960"></a></p>
 
 单题评分维度：相关性 35%、深度 30%、结构 20%、表达 15%。默认 `≥ 7.5 通过 / ≥ 6.0 待定`，可通过环境变量调整。
 
