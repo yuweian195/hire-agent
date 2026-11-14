@@ -6,6 +6,8 @@
 ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688)
 ![Java](https://img.shields.io/badge/Java-21-ED8B00)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F)
+![TypeScript](https://img.shields.io/badge/Frontend-TypeScript-3178C6)
+![React](https://img.shields.io/badge/React-19-61DAFB)
 ![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B)
 
 面向中小团队招聘场景的智能筛选与面试评估系统。覆盖简历解析、六维评分、人岗匹配、批量排名、面试回答评估和候选人流程管理；全流程由 LangGraph 状态图编排，并保留每个节点的执行轨迹。
@@ -19,6 +21,15 @@
 <p align="center"><a href="docs/screenshots/workbench.png">查看工作台原图</a> · <a href="docs/screenshots/interview-evaluation.png">查看面试评估原图</a> · <a href="docs/screenshots/pipeline-board.png">查看招聘看板原图</a></p>
 
 > 仓库内简历与岗位均为合成样本，用于可复现的工程评估；接入真实数据时请替换 `data/` 目录，并遵守候选人隐私与数据合规要求。
+
+## 技术栈
+
+| 层 | 技术 |
+|---|---|
+| Agent / API | Python 3.11、FastAPI、LangGraph |
+| 前端 | TypeScript 5、React 19、Vite、Streamlit |
+| 企业集成 | Java 21、Spring Boot 3、H2 |
+| 存储 | SQLite（WAL 模式） |
 
 ## 业务背景
 
